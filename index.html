@@ -1,0 +1,274 @@
+<!-- index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flashcards (CSV)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 24px; background: #0b0f19; color: #e9eefc; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 12px; font-weight: 700; }
+    .bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    button, input[type="file"]::file-selector-button {
+      background: #1e2a44; color: #e9eefc; border: 1px solid #2c3d63;
+      padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    }
+    button:hover, input[type="file"]::file-selector-button:hover { filter: brightness(1.1); }
+    .meta { opacity: .85; font-size: 13px; }
+    .card {
+      border: 1px solid #2c3d63; border-radius: 16px; padding: 22px;
+      background: #111a2f; min-height: 220px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .label { font-size: 12px; opacity: .8; text-transform: uppercase; letter-spacing: .08em; }
+    .text { font-size: 20px; line-height: 1.25; white-space: pre-wrap; }
+    .answer { border-top: 1px solid #2c3d63; padding-top: 14px; display: none; }
+    .pillrow { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      font-size: 12px; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid #2c3d63; background: #0d1426; opacity: .95;
+    }
+    .hint { margin-top: 10px; font-size: 12px; opacity: .8; }
+    .kbd { border: 1px solid #2c3d63; padding: 2px 6px; border-radius: 6px; background: #0d1426; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Flashcards (CSV → random)</h1>
+
+    <div class="bar">
+      <input id="file" type="file" accept=".csv,text/csv" />
+      <button id="loadLocal">Load cards.csv (same folder)</button>
+      <button id="flip">Flip (Space)</button>
+      <button id="next">Next (N)</button>
+      <button id="shuffle">Shuffle (S)</button>
+      <div class="meta" id="status">No cards loaded.</div>
+    </div>
+
+    <div class="card" id="card">
+      <div class="pillrow" id="pills"></div>
+      <div>
+        <div class="label">Front</div>
+        <div class="text" id="front">Load a CSV to start.</div>
+      </div>
+      <div class="answer" id="answerBlock">
+        <div class="label">Back</div>
+        <div class="text" id="back"></div>
+      </div>
+      <div class="hint">
+        Keys: <span class="kbd">Space</span> flip • <span class="kbd">N</span> next • <span class="kbd">S</span> shuffle
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- CSV parsing (handles quotes + commas) ----
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0, field = '', row = [], inQuotes = false;
+
+      // Normalize newlines
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      while (i < text.length) {
+        const c = text[i];
+
+        if (inQuotes) {
+          if (c === '"') {
+            // Double quote inside quoted field => literal quote
+            if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ''; i++; continue; }
+        if (c === '\n') {
+          row.push(field); field = '';
+          // Ignore completely empty lines
+          if (!(row.length === 1 && row[0].trim() === '')) rows.push(row);
+          row = [];
+          i++; continue;
+        }
+        field += c; i++;
+      }
+
+      // final field
+      if (field.length || row.length) {
+        row.push(field);
+        if (!(row.length === 1 && row[0].trim() === '')) rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function toCards(rows) {
+      // Expected: Question, Answer, Tags, Difficulty
+      // No header required (but if user has one, it will still work if it looks like a header)
+      const cards = [];
+
+      for (const r of rows) {
+        if (r.length < 2) continue;
+
+        const q = (r[0] ?? '').trim();
+        const a = (r[1] ?? '').trim();
+        const tags = (r[2] ?? '').trim();
+        const diff = (r[3] ?? '').trim();
+
+        // Skip likely header row
+        const headerish = q.toLowerCase() === 'question' && a.toLowerCase() === 'answer';
+        if (headerish) continue;
+
+        if (!q || !a) continue;
+
+        cards.push({
+          question: q,
+          answer: a,
+          tags,
+          difficulty: diff
+        });
+      }
+
+      return cards;
+    }
+
+    // ---- Flashcard engine ----
+    let CARDS = [];
+    let order = [];
+    let cursor = 0;
+    let showingAnswer = false;
+
+    const elFront = document.getElementById('front');
+    const elBack = document.getElementById('back');
+    const elAnswerBlock = document.getElementById('answerBlock');
+    const elStatus = document.getElementById('status');
+    const elPills = document.getElementById('pills');
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function rebuildOrder() {
+      order = shuffleArray([...Array(CARDS.length).keys()]);
+      cursor = 0;
+    }
+
+    function updateStatus() {
+      if (!CARDS.length) {
+        elStatus.textContent = 'No cards loaded.';
+        return;
+      }
+      elStatus.textContent = `Card ${Math.min(cursor + 1, CARDS.length)} / ${CARDS.length}`;
+    }
+
+    function render() {
+      if (!CARDS.length) {
+        elFront.textContent = 'Load a CSV to start.';
+        elBack.textContent = '';
+        elAnswerBlock.style.display = 'none';
+        elPills.innerHTML = '';
+        updateStatus();
+        return;
+      }
+
+      if (cursor >= order.length) rebuildOrder(); // loop reshuffle automatically
+
+      const idx = order[cursor];
+      const c = CARDS[idx];
+
+      elFront.textContent = cleanFront(c.question);
+      elBack.textContent = c.answer;
+
+      // pills
+      elPills.innerHTML = '';
+      if (c.difficulty) {
+        const p = document.createElement('span');
+        p.className = 'pill';
+        p.textContent = c.difficulty;
+        elPills.appendChild(p);
+      }
+      if (c.tags) {
+        const tags = c.tags.split(/\s+/).filter(Boolean).slice(0, 6);
+        for (const t of tags) {
+          const p = document.createElement('span');
+          p.className = 'pill';
+          p.textContent = t;
+          elPills.appendChild(p);
+        }
+      }
+
+      showingAnswer = false;
+      elAnswerBlock.style.display = 'none';
+      updateStatus();
+    }
+
+    function cleanFront(text) {
+  	return text.replace(/^\s*[^:]{1,120}:\s*/i, '').trim();
+    }
+
+    function flip() {
+      if (!CARDS.length) return;
+      showingAnswer = !showingAnswer;
+      elAnswerBlock.style.display = showingAnswer ? 'block' : 'none';
+    }
+
+    function nextCard() {
+      if (!CARDS.length) return;
+      cursor++;
+      if (cursor >= order.length) rebuildOrder();
+      render();
+    }
+
+    function shuffleNow() {
+      if (!CARDS.length) return;
+      rebuildOrder();
+      render();
+    }
+
+    function loadFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result;
+        const rows = parseCSV(text);
+        CARDS = toCards(rows);
+        rebuildOrder();
+        render();
+      };
+      reader.readAsText(file);
+    }
+
+    // ---- Events ----
+    document.getElementById('flip').addEventListener('click', flip);
+    document.getElementById('next').addEventListener('click', nextCard);
+    document.getElementById('shuffle').addEventListener('click', shuffleNow);
+
+    document.getElementById('file').addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (f) loadFromFile(f);
+    });
+
+    document.getElementById('loadLocal').addEventListener('click', async () => {
+      try {
+        await loadFromLocalCSV();
+      } catch (err) {
+        elStatus.textContent = 'Failed to load cards.csv. Use the file picker or run a local server.';
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); flip(); }
+      if (e.key.toLowerCase() === 'n') nextCard();
+      if (e.key.toLowerCase() === 's') shuffleNow();
+    });
+
+    render();
+  </script>
+</body>
+</html>
