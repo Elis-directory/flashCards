@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Flashcards (CSV)</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      --text-zoom: 1.2; /* default = +20% */
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0b0f19;
+      color: #e9eefc;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 12px;
+      font-weight: 700;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .left-col {
+      min-width: 0;
+    }
+
+    .right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: sticky;
+      top: 12px;
+    }
+
+    .panel {
+      background: #111a2f;
+      border: 1px solid #2c3d63;
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      opacity: .9;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .controls {
+      display: grid;
+      gap: 10px;
+    }
+
+    button, input[type="file"]::file-selector-button {
+      background: #1e2a44;
+      color: #e9eefc;
+      border: 1px solid #2c3d63;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      text-align: left;
+    }
+
+    button:hover, input[type="file"]::file-selector-button:hover {
+      filter: brightness(1.1);
+    }
+
+    input[type="file"] {
+      width: 100%;
+      color: #cfd9f8;
+      font-size: 13px;
+    }
+
+    .meta {
+      opacity: .9;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .zoom-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .zoom-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      opacity: .9;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: auto;
+    }
+
+    .card {
+      border: 1px solid #2c3d63;
+      border-radius: 16px;
+      padding: 22px;
+      background: #111a2f;
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: pan-y;
+      position: relative;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .card.tap-feedback { transform: scale(0.995); }
+    .card.swiping { transition: none; }
+
+    .label {
+      font-size: 12px;
+      opacity: .8;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .text {
+      font-size: calc(20px * var(--text-zoom)); /* 20% larger by default */
+      line-height: 1.28;
+      white-space: pre-wrap;
+    }
+
+    .answer {
+      border-top: 1px solid #2c3d63;
+      padding-top: 14px;
+      display: none;
+    }
+
+    .pillrow {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #2c3d63;
+      background: #0d1426;
+      opacity: .95;
+    }
+
+    .hint {
+      margin-top: auto;
+      font-size: 12px;
+      opacity: .8;
+      line-height: 1.35;
+    }
+
+    .kbd {
+      border: 1px solid #2c3d63;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #0d1426;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .right-col {
+        position: static;
+      }
+
+      .controls {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      button, input[type="file"]::file-selector-button {
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 14px; }
+      .card { padding: 16px; min-height: 280px; }
+      .text { font-size: calc(22px * var(--text-zoom)); line-height: 1.3; }
+      .controls { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Flashcards (CSV → random)</h1>
+
+    <div class="layout">
+      <!-- LEFT: Flashcard -->
+      <div class="left-col">
+        <div class="card" id="card" aria-label="Flashcard" role="button" tabindex="0">
+          <div class="pillrow" id="pills"></div>
+
+          <div>
+            <div class="label">Front</div>
+            <div class="text" id="front">Load a CSV to start.</div>
+          </div>
+
+          <div class="answer" id="answerBlock">
+            <div class="label">Back</div>
+            <div class="text" id="back"></div>
+          </div>
+
+          <div class="hint">
+            Tap card to flip • Swipe left = next • Swipe right = previous<br>
+            Desktop: <span class="kbd">Space</span> flip • <span class="kbd">N</span> next • <span class="kbd">P</span> prev • <span class="kbd">S</span> shuffle
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Controls -->
+      <div class="right-col">
+        <div class="panel">
+          <h2>Cards</h2>
+          <div class="controls">
+            <input id="file" type="file" accept=".csv,text/csv" />
+            <button id="loadLocal">Load cards.csv (same folder)</button>
+            <button id="flip">Flip (Space)</button>
+            <button id="next">Next (N)</button>
+            <button id="prev">Prev (P)</button>
+            <button id="shuffle">Shuffle (S)</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Zoom</h2>
+          <div class="zoom-row">
+            <div class="zoom-label">
+              <span>Text size</span>
+              <span id="zoomValue">120%</span>
+            </div>
+            <input id="zoomDial" type="range" min="70" max="200" step="5" value="120" />
+            <div class="meta">Use the dial to zoom the flashcard text in or out.</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Status</h2>
+          <div class="meta" id="status">No cards loaded.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- CSV parsing (handles quotes + commas) ----
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0, field = '', row = [], inQuotes = false;
+
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      while (i < text.length) {
+        const c = text[i];
+
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ''; i++; continue; }
+        if (c === '\n') {
+          row.push(field); field = '';
+          if (!(row.length === 1 && row[0].trim() === '')) rows.push(row);
+          row = [];
+          i++; continue;
+        }
+        field += c; i++;
+      }
+
+      if (field.length || row.length) {
+        row.push(field);
+        if (!(row.length === 1 && row[0].trim() === '')) rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function toCards(rows) {
+      const cards = [];
+      for (const r of rows) {
+        if (r.length < 2) continue;
+
+        const q = (r[0] ?? '').trim();
+        const a = (r[1] ?? '').trim();
+        const tags = (r[2] ?? '').trim();
+        const diff = (r[3] ?? '').trim();
+
+        const headerish = q.toLowerCase() === 'question' && a.toLowerCase() === 'answer';
+        if (headerish) continue;
+        if (!q || !a) continue;
+
+        cards.push({ question: q, answer: a, tags, difficulty: diff });
+      }
+      return cards;
+    }
+
+    // ---- Flashcard engine ----
+    let CARDS = [];
+    let order = [];
+    let cursor = 0;
+    let showingAnswer = false;
+
+    const elCard = document.getElementById('card');
+    const elFront = document.getElementById('front');
+    const elBack = document.getElementById('back');
+    const elAnswerBlock = document.getElementById('answerBlock');
+    const elStatus = document.getElementById('status');
+    const elPills = document.getElementById('pills');
+
+    const elZoomDial = document.getElementById('zoomDial');
+    const elZoomValue = document.getElementById('zoomValue');
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function rebuildOrder() {
+      order = shuffleArray([...Array(CARDS.length).keys()]);
+      cursor = 0;
+    }
+
+    function updateStatus(extra = '') {
+      if (!CARDS.length) {
+        elStatus.textContent = 'No cards loaded.';
+        return;
+      }
+      elStatus.textContent = `Card ${Math.min(cursor + 1, CARDS.length)} / ${CARDS.length}${extra ? ' • ' + extra : ''}`;
+    }
+
+    function render() {
+      if (!CARDS.length) {
+        elFront.textContent = 'Load a CSV to start.';
+        elBack.textContent = '';
+        elAnswerBlock.style.display = 'none';
+        elPills.innerHTML = '';
+        updateStatus();
+        return;
+      }
+
+      if (cursor >= order.length) rebuildOrder();
+
+      const idx = order[cursor];
+      const c = CARDS[idx];
+
+      elFront.textContent = cleanFront(c.question);
+      elBack.textContent = c.answer;
+
+      elPills.innerHTML = '';
+      if (c.difficulty) {
+        const p = document.createElement('span');
+        p.className = 'pill';
+        p.textContent = c.difficulty;
+        elPills.appendChild(p);
+      }
+      if (c.tags) {
+        const tags = c.tags.split(/\s+/).filter(Boolean).slice(0, 6);
+        for (const t of tags) {
+          const p = document.createElement('span');
+          p.className = 'pill';
+          p.textContent = t;
+          elPills.appendChild(p);
+        }
+      }
+
+      showingAnswer = false;
+      elAnswerBlock.style.display = 'none';
+      updateStatus();
+    }
+
+    function cleanFront(text) {
+      return text.replace(/^\s*[^:]{1,120}:\s*/i, '').trim();
+    }
+
+    function flip() {
+      if (!CARDS.length) return;
+      showingAnswer = !showingAnswer;
+      elAnswerBlock.style.display = showingAnswer ? 'block' : 'none';
+    }
+
+    function nextCard() {
+      if (!CARDS.length) return;
+      cursor++;
+      if (cursor >= order.length) rebuildOrder();
+      render();
+    }
+
+    function prevCard() {
+      if (!CARDS.length) return;
+      cursor--;
+      if (cursor < 0) cursor = order.length - 1;
+      render();
+    }
+
+    function shuffleNow() {
+      if (!CARDS.length) return;
+      rebuildOrder();
+      render();
+    }
+
+    function loadFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result ?? '');
+        const rows = parseCSV(text);
+        CARDS = toCards(rows);
+        rebuildOrder();
+        render();
+      };
+      reader.readAsText(file);
+    }
+
+    async function loadFromLocalCSV() {
+      const res = await fetch('./cards.csv', { cache: 'no-store' });
+      if (!res.ok) throw new Error('cards.csv not found');
+      const text = await res.text();
+      const rows = parseCSV(text);
+      CARDS = toCards(rows);
+      rebuildOrder();
+      render();
+    }
+
+    // ---- Zoom dial ----
+    function applyZoom(percent) {
+      const scale = percent / 100;
+      document.documentElement.style.setProperty('--text-zoom', String(scale));
+      elZoomValue.textContent = `${percent}%`;
+      localStorage.setItem('flashcardTextZoom', String(percent));
+    }
+
+    elZoomDial.addEventListener('input', (e) => {
+      applyZoom(Number(e.target.value));
+    });
+
+    // Restore saved zoom (if any)
+    const savedZoom = Number(localStorage.getItem('flashcardTextZoom') || '120');
+    if (!Number.isNaN(savedZoom) && savedZoom >= 70 && savedZoom <= 200) {
+      elZoomDial.value = String(savedZoom);
+      applyZoom(savedZoom);
+    } else {
+      applyZoom(120);
+    }
+
+    // ---- Button events ----
+    document.getElementById('flip').addEventListener('click', flip);
+    document.getElementById('next').addEventListener('click', nextCard);
+    document.getElementById('prev').addEventListener('click', prevCard);
+    document.getElementById('shuffle').addEventListener('click', shuffleNow);
+
+    document.getElementById('file').addEventListener('change', (e) => {
+      const f = e.target.files?.[0];
+      if (f) loadFromFile(f);
+    });
+
+    document.getElementById('loadLocal').addEventListener('click', async () => {
+      try {
+        await loadFromLocalCSV();
+      } catch (err) {
+        elStatus.textContent = 'Failed to load cards.csv. Use the file picker or run a local server.';
+      }
+    });
+
+    // ---- Keyboard ----
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); flip(); }
+      if (e.key.toLowerCase() === 'n') nextCard();
+      if (e.key.toLowerCase() === 'p') prevCard();
+      if (e.key.toLowerCase() === 's') shuffleNow();
+      if (e.key === 'Enter' && document.activeElement === elCard) flip();
+    });
+
+    // ---- Touch / Pointer gestures ----
+    let pointerDown = false;
+    let startX = 0, startY = 0;
+    let lastX = 0, lastY = 0;
+    let startTime = 0;
+    let lockedHorizontal = false;
+
+    const SWIPE_X_THRESHOLD = 45;
+    const TAP_MOVE_THRESHOLD = 10;
+    const VERTICAL_CANCEL_THRESHOLD = 18;
+    const MAX_TAP_MS = 280;
+
+    function resetGestureVisual() {
+      elCard.classList.remove('swiping');
+      elCard.style.transform = '';
+    }
+
+    elCard.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+      pointerDown = true;
+      lockedHorizontal = false;
+      startX = lastX = e.clientX;
+      startY = lastY = e.clientY;
+      startTime = Date.now();
+
+      elCard.classList.add('tap-feedback');
+      elCard.setPointerCapture?.(e.pointerId);
+    });
+
+    elCard.addEventListener('pointermove', (e) => {
+      if (!pointerDown) return;
+
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      const dx = lastX - startX;
+      const dy = lastY - startY;
+
+      if (!lockedHorizontal && Math.abs(dy) > VERTICAL_CANCEL_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+        return;
+      }
+
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        lockedHorizontal = true;
+      }
+
+      if (lockedHorizontal) {
+        elCard.classList.add('swiping');
+        elCard.style.transform = `translateX(${dx * 0.35}px)`;
+      }
+    });
+
+    function finalizePointer() {
+      if (!pointerDown) return;
+      pointerDown = false;
+
+      elCard.classList.remove('tap-feedback');
+
+      const dx = lastX - startX;
+      const dy = lastY - startY;
+      const dt = Date.now() - startTime;
+
+      const isTap = Math.abs(dx) <= TAP_MOVE_THRESHOLD &&
+                    Math.abs(dy) <= TAP_MOVE_THRESHOLD &&
+                    dt <= MAX_TAP_MS;
+
+      const isHorizontalSwipe = Math.abs(dx) >= SWIPE_X_THRESHOLD &&
+                                Math.abs(dx) > Math.abs(dy);
+
+      resetGestureVisual();
+
+      if (!CARDS.length) return;
+
+      if (isHorizontalSwipe) {
+        if (dx < 0) nextCard();
+        else prevCard();
+        return;
+      }
+
+      if (isTap) flip();
+    }
+
+    elCard.addEventListener('pointerup', finalizePointer);
+    elCard.addEventListener('pointercancel', () => {
+      pointerDown = false;
+      elCard.classList.remove('tap-feedback');
+      resetGestureVisual();
+    });
+
+    // Prevent duplicate click behavior (pointer handlers already do tap-to-flip)
+    elCard.addEventListener('click', (e) => e.preventDefault());
+
+    render();
+  </script>
+</body>
+</html>
