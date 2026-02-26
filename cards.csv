@@ -1,0 +1,25 @@
+Term,Definition,Category,Difficulty
+Perfect Forward Secrecy (PFS),"Compromise of one long-term key does not expose past session keys; each session remains protected even if the long-term key is later stolen.",Cryptography / Key Management,Medium
+Password Hashing,"A defensive control that reduces the value of a stolen password database by storing hashes instead of plaintext passwords.",Authentication / Defensive Controls,Easy
+Network Segmentation,"A defensive control that limits lateral movement and reduces blast radius by separating systems or network zones.",Network Security / Defensive Controls,Easy
+CSR (Certificate Signing Request),"A cryptographic request sent to a Certificate Authority to obtain a certificate; it includes identity information and a public key.",PKI / Certificates,Medium
+OID (Object Identifier),"A hierarchical identifier used in standards to uniquely name objects such as cryptographic algorithms, certificate extensions, attributes, and protocol-defined data types; it is globally unambiguous through delegated assignment.",PKI / Standards,Medium
+Advanced Persistent Threat (APT),"A long-term attack campaign conducted by organized, well-resourced attackers, often associated with nation-state-level capability.",Threat Actors / Attack Types,Easy
+CTR Mode,"A block cipher mode that combines a unique counter with an encryption key to generate a pseudorandom keystream used to encrypt data.",Cryptography / Encryption Modes,Medium
+SRTP,"The secure form of RTP for real-time media; it provides encryption, message authentication, and integrity protection.",Network Security / Secure Protocols,Medium
+Bluesnarfing vs Bluejacking,"Bluesnarfing is unauthorized access to or exfiltration from a Bluetooth device, while Bluejacking is the sending of unsolicited messages over Bluetooth.",Wireless Security / Bluetooth,Easy
+LDAP,"Lightweight Directory Access Protocol used to query and manage directory resources such as users, groups, and objects.",Directory Services / Identity,Easy
+LDAP Injection,"An attack against applications that build LDAP queries from untrusted input, allowing crafted input to alter directory queries.",Directory Services / Injection Attacks,Medium
+XML Injection,"An attack against applications that generate or process XML-formatted data, targeting XML handling rather than directory queries.",Application Security / Injection Attacks,Medium
+Downgrade Attack vs Disassociation,"A downgrade attack forces the use of weaker security protocols or ciphers, while disassociation forces clients off a connection.",Network Security / Wireless Attacks,Medium
+GCM,"An authenticated encryption mode that provides confidentiality plus integrity and authentication.",Cryptography / Encryption Modes,Medium
+GCM vs ECB/CBC/CFB,"GCM provides both encryption and authentication, while ECB, CBC, and CFB provide encryption but do not inherently provide authentication.",Cryptography / Encryption Modes,Medium
+Agentless,"Means no malicious agent is installed on the target endpoint; activity may occur through network or protocol interaction, or passive monitoring.",Security Operations / Threat Methods,Medium
+KDC (Key Distribution Center),"The central service that distributes keys and supports authentication in systems such as Kerberos.",Authentication / Kerberos,Medium
+WPS (Wi-Fi Protected Setup),"A feature designed to simplify wireless setup and device onboarding for non-technical users.",Wireless Security,Easy
+RSA vs DES vs AES,"RSA is a public-key cryptosystem used for encryption and digital signatures; DES is a legacy symmetric algorithm considered weak; AES is a fast symmetric algorithm.",Cryptography / Algorithms,Medium
+TKIP vs WPA2,"TKIP was designed to address weaknesses in WEP, while WPA2 primarily uses CCMP, which is AES-based; TKIP is associated with WPA and transitional legacy use, not WPA2’s primary design.",Wireless Security / Wi-Fi Standards,Medium
+RSA,"A public-key cryptosystem used for encryption and digital signatures, and historically for key exchange.",Cryptography / Algorithms,Easy
+WEP and RC4,"WEP uses RC4, and RC4 is deprecated and considered unsafe for modern use.",Wireless Security / Legacy Cryptography,Easy
+Pass the Hash,"An attack where a captured password hash is used directly for authentication without needing the cleartext password.",Authentication Attacks,Medium
+DNS Spoofing vs DNS Cache Poisoning vs ARP Poisoning,"DNS spoofing is the broad act of providing false DNS data to redirect users; DNS cache poisoning inserts false DNS records so a domain resolves to an attacker-controlled IP; ARP poisoning manipulates local MAC-to-IP mappings and does not change DNS name resolution.",Network Security / Network Attacks,Medium
